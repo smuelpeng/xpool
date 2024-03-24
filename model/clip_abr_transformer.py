@@ -23,17 +23,20 @@ class CLIPABRTransformer(nn.Module):
         batch_size = data['video'].shape[0]
         text_data = data['text']
         video_data = data['video']
-        frame_cap_data = data['frame_caption']
+        if frame_caption:
+            frame_cap_data = data['frame_caption']
 
         video_data = video_data.reshape(-1, 3, self.config.input_res, self.config.input_res)
         if self.config.huggingface:
             text_features = self.clip.get_text_features(**text_data)
             video_features = self.clip.get_image_features(video_data)
-            cap_features = self.clip.get_text_features(**frame_cap_data)
+            if frame_caption:
+                cap_features = self.clip.get_text_features(**frame_cap_data)
         else:
             text_features = self.clip.encode_text(text_data)
             video_features = self.clip.encode_image(video_data)
-            cap_features = self.clip.encode_text(frame_cap_data)
+            if frame_caption:
+                cap_features = self.clip.encode_text(frame_cap_data)
 
         video_features = video_features.reshape(batch_size, self.config.num_frames, -1)
         frame_features = video_features

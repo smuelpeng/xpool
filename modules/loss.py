@@ -81,8 +81,10 @@ class ABRLoss(nn.Module):
         self.framecap_loss = FrameCapNCELoss(config)
         self.config = config
         
-    def forward(self, sims, frame_embeds, cap_embeds, frame_labels, cap_labels, logit_scale ):
+    def forward(self, sims, logit_scale, frame_embeds=None, cap_embeds=None, frame_labels=None, cap_labels=None):
         clip_loss = self.clip_loss(sims, logit_scale)
+        if frame_embeds is None:
+            return clip_loss
         frame_loss = self.framecap_loss(frame_embeds, cap_embeds, frame_labels, cap_labels)
         print(f'clip_loss: {clip_loss}, frame_loss: {frame_loss}')
         return clip_loss + self.config.framecap_loss_weight * frame_loss

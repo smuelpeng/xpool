@@ -38,7 +38,7 @@ class ABRTrainer(BaseTrainer):
         self.model.train()
         total_loss = 0.0
         num_steps = len(self.train_data_loader)
-        eval_steps = np.linspace(0, num_steps-1, self.evals_per_epoch+1, dtype=int)[1:]
+        eval_steps = np.linspace(0, num_steps-1, self.evals_per_epoch+1, dtype=int)#[1:]
         
         for batch_idx, data in enumerate(self.train_data_loader):
             # then assume we must tokenize the input, e.g. its a string
@@ -67,11 +67,10 @@ class ABRTrainer(BaseTrainer):
             # loss = self.loss(output, self.model.clip.logit_scale)
             loss = self.loss(
                 output, 
+                self.model.clip.logit_scale,
                 frame_embeds, 
                 cap_embeds, 
                 data['video_id'],
-                None,
-                self.model.clip.logit_scale,
             )
             loss.backward()
             
