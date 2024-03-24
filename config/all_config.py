@@ -44,6 +44,8 @@ class AllConfig(Config):
         parser.add_argument('--num_epochs', type=int, default=5)
         parser.add_argument('--weight_decay', type=float, default=0.2, help='Weight decay')
         parser.add_argument('--warmup_proportion', type=float, default=0.1, help='Warmup proportion for learning rate schedule')
+        parser.add_argument('--framecap_loss_weight', type=float, default=1.0, help='framecap loss weight')
+        
 
         # frame pooling parameters
         parser.add_argument('--pooling_type', type=str)

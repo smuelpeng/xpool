@@ -34,6 +34,7 @@ class Config(ABC):
         self.num_epochs = args.num_epochs
         self.weight_decay = args.weight_decay
         self.warmup_proportion = args.warmup_proportion
+        self.framecap_loss_weight = args.framecap_loss_weight
     
         self.pooling_type = args.pooling_type
         self.k = args.k
