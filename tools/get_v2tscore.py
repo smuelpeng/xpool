@@ -68,15 +68,17 @@ class VideoCapture:
         return frames, frame_idxs
 
 def get_itm_score(raw_image, caption):
-    img = vis_processors["eval"](raw_image).unsqueeze(0).to(device)
-    txt = text_processors["eval"](caption)
-    itm_output = model({"image": img, "text_input": txt}, match_head="itm")
-    itm_scores = torch.nn.functional.softmax(itm_output, dim=1)
-    print(
-         f'The image and text are matched with a probability of {itm_scores[:, 1].item():.3%}')
-    itc_score = model({"image": img, "text_input": txt}, match_head='itc')
-    print('The image feature and text feature has a cosine similarity of %.4f' % itc_score)
-    return itm_scores[:,1].item(), itc_score
+    with torch.no_grad():
+        img = vis_processors["eval"](raw_image).unsqueeze(0).to(device)
+        txt = text_processors["eval"](caption)
+        itm_output = model({"image": img, "text_input": txt}, match_head="itm")
+        itm_scores = torch.nn.functional.softmax(itm_output, dim=1)
+        #print(
+        #     f'The image and text are matched with a probability of {itm_scores[:, 1].item():.3%}')
+        itc_score = model({"image": img, "text_input": txt}, match_head='itc')
+        #print('The image feature and text feature has a cosine similarity of %.4f' % itc_score)
+        del img
+        return itm_scores[:,1].item(), itc_score
 
 
 def load_caption(db_file):
@@ -102,7 +104,7 @@ def get_video_caption_scores(video_id):
             itm_score, itc_score = get_itm_score(img, caption)
             itm_scores[i,j] = itm_score
             itc_scores[i,j] = itc_score
-    print(itm_scores)
+    print(itm_scores.shape)
     return itm_scores, itc_scores
 
 device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
