@@ -12,6 +12,8 @@ import random
 import numpy as np
 import torch
 from tqdm import tqdm
+from multiprocessing import Pool
+
 
 class VideoCapture:
 
@@ -33,7 +35,8 @@ class VideoCapture:
 
         # get indexes of sampled frames
         acc_samples = min(num_frames, vlen)
-        intervals = np.linspace(start=0, stop=vlen, num=acc_samples + 1).astype(int)
+        intervals = np.linspace(
+            start=0, stop=vlen, num=acc_samples + 1).astype(int)
         ranges = []
 
         # ranges constructs equal spaced intervals (start, end)
@@ -61,22 +64,24 @@ class VideoCapture:
                 frames.append(frame)
             else:
                 raise ValueError
-            
+
         while len(frames) < num_frames:
-            frames.append(frames[-1].clone())            
+            frames.append(frames[-1].clone())
         cap.release()
         return frames, frame_idxs
 
-def get_itm_score(raw_image, caption):
-    img = vis_processors["eval"](raw_image).unsqueeze(0).to(device)
-    txt = text_processors["eval"](caption)
-    itm_output = model({"image": img, "text_input": txt}, match_head="itm")
-    itm_scores = torch.nn.functional.softmax(itm_output, dim=1)
-    print(
-         f'The image and text are matched with a probability of {itm_scores[:, 1].item():.3%}')
-    itc_score = model({"image": img, "text_input": txt}, match_head='itc')
-    print('The image feature and text feature has a cosine similarity of %.4f' % itc_score)
-    return itm_scores[:,1].item(), itc_score
+# def get_itm_score(raw_image, caption):
+#     with torch.no_grad():
+#         img = vis_processors["eval"](raw_image).unsqueeze(0).to(device)
+#         txt = text_processors["eval"](caption)
+#         itm_output = model({"image": img, "text_input": txt}, match_head="itm")
+#         itm_scores = torch.nn.functional.softmax(itm_output, dim=1)
+#         #print(
+#         #     f'The image and text are matched with a probability of {itm_scores[:, 1].item():.3%}')
+#         itc_score = model({"image": img, "text_input": txt}, match_head='itc')
+#         #print('The image feature and text feature has a cosine similarity of %.4f' % itc_score)
+#         del img
+#         return itm_scores[:,1].item(), itc_score
 
 
 def load_caption(db_file):
@@ -89,32 +94,100 @@ def load_caption(db_file):
     return vid2caption
 
 
-def get_video_caption_scores(video_id):
-    video_path = f'{video_prefix}{video_id}.mp4'
-    imgs, idxs = VideoCapture.load_frames_from_video(video_path,
-                                                     12,
-                                                     'uniform')
-    itm_scores = torch.zeros( (len(imgs), len(vid2caption_dict[video_id])) )
-    itc_scores = torch.zeros( (len(imgs), len(vid2caption_dict[video_id])) )
-    for i,img in enumerate(imgs):
-        img = Image.fromarray(img)
-        for j,caption in enumerate(vid2caption_dict[video_id]):
-            itm_score, itc_score = get_itm_score(img, caption)
-            itm_scores[i,j] = itm_score
-            itc_scores[i,j] = itc_score
-    print(itm_scores)
-    return itm_scores, itc_scores
+# def get_video_caption_scores(video_id):
+#     video_path = f'{video_prefix}{video_id}.mp4'
+#     imgs, idxs = VideoCapture.load_frames_from_video(video_path,
+#                                                      12,
+#                                                      'uniform')
+#     itm_scores = torch.zeros( (len(imgs), len(vid2caption_dict[video_id])) )
+#     itc_scores = torch.zeros( (len(imgs), len(vid2caption_dict[video_id])) )
+#     for i,img in enumerate(imgs):
+#         img = Image.fromarray(img)
+#         for j,caption in enumerate(vid2caption_dict[video_id]):
+#             # itm_score, itc_score = get_itm_score(img, caption)
+#             with torch.no_grad():
+#                 img = vis_processors["eval"](raw_image).unsqueeze(0).to(device)
+#                 txt = text_processors["eval"](caption)
+#                 itm_output = model({"image": img, "text_input": txt}, match_head="itm")
+#                 itm_scores = torch.nn.functional.softmax(itm_output, dim=1)
+#                 #print(
+#                 #     f'The image and text are matched with a probability of {itm_scores[:, 1].item():.3%}')
+#                 itc_score = model({"image": img, "text_input": txt}, match_head='itc')
+#                 #print('The image feature and text feature has a cosine similarity of %.4f' % itc_score)
+#                 del img
+#                 return itm_scores[:,1].item(), itc_score
+#             itm_scores[i,j] = itm_score
+#             itc_scores[i,j] = itc_score
+#     # print(itm_scores.shape)
+#     return itm_scores, itc_scores
 
-device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
-model, vis_processors, text_processors = load_model_and_preprocess(
-    "blip2_image_text_matching", "pretrain", device=device, is_eval=True)
-print('load model finished!!')
+
+def task_list(video_ids, gpu_id):
+    device = torch.device(
+        "cuda", gpu_id) if torch.cuda.is_available() else "cpu"
+    model, vis_processors, text_processors = load_model_and_preprocess(
+        "blip2_image_text_matching", "pretrain", device=device, is_eval=True)
+    itm_res = {}
+    itc_res = {}
+    global vid2caption_dict
+    for video_id in video_ids:
+        # itm_scores, itc_scores = get_video_caption_scores(video_id)
+        video_path = f'{video_prefix}{video_id}.mp4'
+        imgs, idxs = VideoCapture.load_frames_from_video(video_path,
+                                                         12,
+                                                         'uniform')
+        itm_scores = torch.zeros((len(imgs), len(vid2caption_dict[video_id])))
+        itc_scores = torch.zeros((len(imgs), len(vid2caption_dict[video_id])))
+        for i, img in enumerate(imgs):
+            img = Image.fromarray(img)
+            for j, caption in enumerate(vid2caption_dict[video_id]):
+                # itm_score, itc_score = get_itm_score(img, caption)
+                with torch.no_grad():
+                    img = vis_processors["eval"](img).unsqueeze(0).to(device)
+                    txt = text_processors["eval"](caption)
+                    itm_output = model(
+                        {"image": img, "text_input": txt}, match_head="itm")
+                    itm_score = torch.nn.functional.softmax(
+                        itm_output, dim=1)[:, 1].item()
+                    itc_score = model(
+                        {"image": img, "text_input": txt}, match_head='itc')
+                    itm_scores[i, j] = itm_score
+                    itc_scores[i, j] = itc_score
+                    del img
+        itm_res[video_id] = itm_scores
+        itc_res[video_id] = itc_scores
+    return itm_res, itc_res
+# device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
+# model, vis_processors, text_processors = load_model_and_preprocess(
+#     "blip2_image_text_matching", "pretrain", device=device, is_eval=True)
+# print('load model finished!!')
+
 video_prefix = 'preprocess/all_compress/'
 vid2caption_dict = load_caption('data/MSRVTT/MSRVTT_data.json')
 print('load caption finished!!')
-video_caption_scores = {}
-for video_id in tqdm(vid2caption_dict.keys()):
-    itm_scores, itc_scores = get_video_caption_scores(video_id)
-    video_caption_scores[video_id] = (itm_scores, itc_scores)
-torch.save(video_caption_scores, 'data/MSRVTT/video_caption_scores.pt')
-        
+vtm_result_dict = {}
+vtc_result_dict = {}
+pool = Pool(7)
+video_ids = list(vid2caption_dict.keys())
+n = len(video_ids)
+procs = []
+num_per_task = n // 7 + 1
+for i in range(7):
+    procs.append(
+        pool.apply_async(task_list, args=(
+            video_ids[i*num_per_task:(i+1)*num_per_task], i,))
+    )
+for proc in procs:
+    itm_res, itc_res = proc.get()
+    vtm_result_dict.update(itm_res)
+    vtc_result_dict.update(itc_res)
+pool.close()
+pool.join()
+torch.save(vtm_result_dict, 'data/MSRVTT/vtm_result_dict.pt')
+torch.save(vtc_result_dict, 'data/MSRVTT/vtc_result_dict.pt')
+
+# video_caption_scores = {}
+# for video_id in tqdm(vid2caption_dict.keys()):
+#     itm_scores, itc_scores = get_video_caption_scores(video_id)
+#     video_caption_scores[video_id] = (itm_scores, itc_scores)
+# torch.save(video_caption_scores, 'data/MSRVTT/video_caption_scores.pt')
