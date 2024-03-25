@@ -11,6 +11,7 @@ import cv2
 import random
 import numpy as np
 import torch
+from tqdm import tqdm
 
 class VideoCapture:
 
@@ -71,10 +72,10 @@ def get_itm_score(raw_image, caption):
     txt = text_processors["eval"](caption)
     itm_output = model({"image": img, "text_input": txt}, match_head="itm")
     itm_scores = torch.nn.functional.softmax(itm_output, dim=1)
-    # print(
-    #     f'The image and text are matched with a probability of {itm_scores[:, 1].item():.3%}')
+    print(
+         f'The image and text are matched with a probability of {itm_scores[:, 1].item():.3%}')
     itc_score = model({"image": img, "text_input": txt}, match_head='itc')
-    # print('The image feature and text feature has a cosine similarity of %.4f' % itc_score)
+    print('The image feature and text feature has a cosine similarity of %.4f' % itc_score)
     return itm_scores[:,1].item(), itc_score
 
 
@@ -101,23 +102,19 @@ def get_video_caption_scores(video_id):
             itm_score, itc_score = get_itm_score(img, caption)
             itm_scores[i,j] = itm_score
             itc_scores[i,j] = itc_score
+    print(itm_scores)
     return itm_scores, itc_scores
 
 device = torch.device("cuda") if torch.cuda.is_available() else "cpu"
 model, vis_processors, text_processors = load_model_and_preprocess(
     "blip2_image_text_matching", "pretrain", device=device, is_eval=True)
+print('load model finished!!')
 video_prefix = 'preprocess/all_compress/'
 vid2caption_dict = load_caption('data/MSRVTT/MSRVTT_data.json')
-
-
+print('load caption finished!!')
 video_caption_scores = {}
-for video_id in vid2caption_dict.keys():
+for video_id in tqdm(vid2caption_dict.keys()):
     itm_scores, itc_scores = get_video_caption_scores(video_id)
     video_caption_scores[video_id] = (itm_scores, itc_scores)
-
-    # print(f'Video {video_id} has {len(vid2caption_dict[video_id])} captions')
-    # print(f'ITM scores: {itm_scores}')
-    # print(f'ITC scores: {itc_scores}')
-    # break
 torch.save(video_caption_scores, 'data/MSRVTT/video_caption_scores.pt')
         
