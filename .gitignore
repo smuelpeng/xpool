@@ -1,15 +1,14 @@
-data/
-preprocess/
+/data/
+/preprocess/
 *.mp4
 *.pth
-log/
+/log/
 
 # Custom Ignores
 /results
 /public
 /.idea/
 /.build/
-/model/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

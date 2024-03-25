@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from config.base_config import Config
-from modules.transformer import Transformer
+from modules.transformer import Transformer,Perceiver
 
 class CLIPABRTransformer(nn.Module):
     def __init__(self, config: Config):
@@ -17,6 +17,10 @@ class CLIPABRTransformer(nn.Module):
 
         config.pooling_type = 'transformer'
         self.pool_frames = Transformer(config)
+        if config.visual_proj == 'perceiver':
+            self.visual_proj = Perceiver(config)
+        else:
+            self.visual_proj = nn.Identity()
 
 
     def forward(self, data, return_all_frames=False, frame_caption=False):
@@ -39,12 +43,13 @@ class CLIPABRTransformer(nn.Module):
                 cap_features = self.clip.encode_text(frame_cap_data)
 
         video_features = video_features.reshape(batch_size, self.config.num_frames, -1)
-        frame_features = video_features
+        video_features_proj = self.visual_proj(video_embeds=video_features)
+        # frame_features = video_features
         video_features_pooled = self.pool_frames(text_features, video_features)
         if return_all_frames:
             return text_features, video_features, video_features_pooled
         if frame_caption:
-            return text_features, video_features_pooled, cap_features, frame_features
+            return text_features, video_features_pooled, cap_features, video_features_proj #frame_features
         else:
             return text_features, video_features_pooled
     

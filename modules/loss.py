@@ -86,7 +86,6 @@ class ABRLoss(nn.Module):
         if frame_embeds is None:
             return clip_loss
         frame_loss = self.framecap_loss(frame_embeds, cap_embeds, frame_labels, cap_labels)
-        print(f'clip_loss: {clip_loss}, frame_loss: {frame_loss}')
         return clip_loss + self.config.framecap_loss_weight * frame_loss
     
         
