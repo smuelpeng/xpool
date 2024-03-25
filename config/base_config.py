@@ -37,6 +37,7 @@ class Config(ABC):
         self.framecap_loss_weight = args.framecap_loss_weight
     
         self.pooling_type = args.pooling_type
+        self.visual_proj = args.visual_proj
         self.k = args.k
         self.attention_temperature = args.attention_temperature
         self.num_mha_heads = args.num_mha_heads

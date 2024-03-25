@@ -49,6 +49,7 @@ class AllConfig(Config):
 
         # frame pooling parameters
         parser.add_argument('--pooling_type', type=str)
+        parser.add_argument('--visual_proj', type=str, default='perceiver')
         parser.add_argument('--k', type=int, default=-1, help='K value for topk pooling')
         parser.add_argument('--attention_temperature', type=float, default=0.01, help='Temperature for softmax (used in attention pooling only)')
         parser.add_argument('--num_mha_heads', type=int, default=1, help='Number of parallel heads in multi-headed attention')
