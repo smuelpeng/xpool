@@ -17,6 +17,7 @@ import multiprocessing
 # multiprocessing.set_start_method('spawn')   
 multiprocessing.set_start_method('spawn', force=True)
 from multiprocessing import get_context
+import pandas
 
 class VideoCapture:
 
@@ -96,6 +97,16 @@ def load_caption(db_file):
         vid2caption[vid].append(caption)
     return vid2caption
 
+def load_testcaption_csv(db_file):
+    # db = load_json(db_file)
+    db = pandas.read_csv(db_file)
+    vid2caption = defaultdict(list)
+    for i in range(len(db)):
+        caption = db['sentence'][i]
+        vid = db['video_id'][i]
+        vid2caption[vid].append(caption)
+    return vid2caption
+    
 
 # def get_video_caption_scores(video_id):
 #     video_path = f'{video_prefix}{video_id}.mp4'
@@ -127,7 +138,8 @@ def load_caption(db_file):
 
 def task_list(video_ids, gpu_id):
     video_prefix = 'preprocess/all_compress/'
-    vid2caption_dict = load_caption('data/MSRVTT/MSRVTT_data.json')
+    # vid2caption_dict = load_caption('data/MSRVTT/MSRVTT_data.json')
+    vid2caption_dict = load_testcaption_csv('data/MSRVTT/MSRVTT_JSFUSION_test.csv')
     # print('load caption finished!!')    
     device = torch.device(
         "cuda", gpu_id) if torch.cuda.is_available() else "cpu"
@@ -155,17 +167,18 @@ def task_list(video_ids, gpu_id):
                         {"image": img, "text_input": txt, 'image_embeds': image_embeds}, match_head="itm")
                     itm_score = torch.nn.functional.softmax(
                         itm_output, dim=1)[:, 1].item()
-                    # itc_score = model(
-                    #     {"image": img, "text_input": txt}, match_head='itc')
+                    itc_score = model(
+                        {"image": img, "text_input": txt}, match_head='itc')
                     itm_scores[i, j] = itm_score
-                    # itc_scores[i, j] = itc_score
+                    itc_scores[i, j] = itc_score
                 del img
         itm_res[video_id] = itm_scores.cpu().numpy()
         itc_res[video_id] = itc_scores.cpu().numpy()
     return itm_res, itc_res
 
 if __name__ == '__main__':
-    vid2caption_dict = load_caption('data/MSRVTT/MSRVTT_data.json')
+    # vid2caption_dict = load_caption('data/MSRVTT/MSRVTT_data.json')
+    vid2caption_dict = load_testcaption_csv('data/MSRVTT/MSRVTT_JSFUSION_test.csv')
     vtm_result_dict = {}
     vtc_result_dict = {}
     video_ids = list(vid2caption_dict.keys())
@@ -185,8 +198,8 @@ if __name__ == '__main__':
             vtc_result_dict.update(itc_res)
     pool.close()
     pool.join()
-    torch.save(vtm_result_dict, 'data/MSRVTT/vtm_result_dict.pt')
-    torch.save(vtc_result_dict, 'data/MSRVTT/vtc_result_dict.pt')
+    torch.save(vtm_result_dict, 'data/MSRVTT/test_vtm_result_dict.pt')
+    torch.save(vtc_result_dict, 'data/MSRVTT/test_vtc_result_dict.pt')
     # video_caption_scores = {}
     # for video_id in tqdm(vid2caption_dict.keys()):
     #     itm_scores, itc_scores = get_video_caption_scores(video_id)
